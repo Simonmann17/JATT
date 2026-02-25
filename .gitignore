@@ -1,0 +1,23 @@
+# Virtual environments
+venv/
+.venv/
+backend/venv/
+backend/.venv/
+
+#Gmail OAuth credentials and tokens
+backend/credentials.json
+backend/token.json
+
+# Local database
+backend/jatt.db
+
+# MacOS system files
+.DS_Store
+
+# IDE/editor settings
+.vscode/
+.idea/
+
+# Python cache
+__pycache__/
+*.pyc

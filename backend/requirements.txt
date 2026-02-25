@@ -1,0 +1,8 @@
+fastapi==0.128.8
+uvicorn[standard]==0.34.0
+sqlmodel==0.0.34
+psycopg2-binary==2.9.10
+python-dotenv==1.0.1
+google-api-python-client==2.159.0
+google-auth==2.37.0
+google-auth-oauthlib==1.2.1
