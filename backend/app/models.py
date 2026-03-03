@@ -6,6 +6,7 @@ from sqlmodel import Field, SQLModel
 
 class ApplicationBase(SQLModel):
     vendor: str = Field(index=True)
+    subject: str = Field(default="", index=True)
     job_title: Optional[str] = None
     company: Optional[str] = Field(default=None, index=True)
     location: Optional[str] = None

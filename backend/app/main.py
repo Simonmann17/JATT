@@ -1,6 +1,6 @@
-from typing import List
+from typing import List, Optional
 
-from fastapi import Depends, FastAPI, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlmodel import Session, select
 
 from .db import get_session, init_db
@@ -27,7 +27,10 @@ async def parse_email(
     payload: ApplicationCreate, session: Session = Depends(get_session)
 ) -> ApplicationRead:
     # For now we assume vendor is Workday and run the Workday-specific parser.
-    parsed = parse_workday_email(payload.raw_email)
+    try:
+        parsed = parse_workday_email(payload.raw_email)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     app_row = Application.from_orm(parsed)
     session.add(app_row)
     session.commit()
@@ -42,26 +45,17 @@ async def list_applications(session: Session = Depends(get_session)) -> list[App
     return results
 
 
-@app.post("/gmail/import", response_model=List[ApplicationRead])
+@app.post("/gmail/import", response_model=List[dict])
 async def import_from_gmail(
     limit: int = Query(default=5, ge=1, le=100),
     lookback_days: int = Query(default=90, ge=1, le=3650),
-    session: Session = Depends(get_session),
-) -> List[ApplicationRead]:
+    sender_filter: Optional[str] = Query(default=None, min_length=1),
+) -> List[dict]:
     """
-    Fetch recent Workday emails from Gmail, parse them, store, and return the records.
-
-    Assumes you have set up Gmail API credentials (see README notes).
+    Basic mode: fetch recent Gmail emails and return sender/subject.
+    Optional sender filtering can be applied via sender_filter.
     """
-    raw_emails = fetch_workday_emails(limit=limit, lookback_days=lookback_days)
-    created: list[ApplicationRead] = []
-
-    for raw_email in raw_emails:
-        parsed = parse_workday_email(raw_email)
-        app_row = Application.from_orm(parsed)
-        session.add(app_row)
-        session.commit()
-        session.refresh(app_row)
-        created.append(app_row)
-
-    return created
+    messages = fetch_workday_emails(
+        limit=limit, lookback_days=lookback_days, sender_filter=sender_filter
+    )
+    return [{"sender": m["sender"], "subject": m["subject"]} for m in messages]

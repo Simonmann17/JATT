@@ -10,6 +10,7 @@ except ModuleNotFoundError:
     @dataclass
     class ApplicationCreate:
         vendor: str
+        subject: str
         job_title: Optional[str] = None
         company: Optional[str] = None
         location: Optional[str] = None
@@ -40,6 +41,29 @@ DATE_FORMATS: tuple[str, ...] = (
     "%m/%d/%Y",     # 02/19/2026
     "%Y-%m-%d",     # 2026-02-19
 )
+
+
+def _extract_sender_email(raw_email: str) -> Optional[str]:
+    from_line_match = re.search(
+        r"^From:\s*(.+)$",
+        raw_email,
+        re.IGNORECASE | re.MULTILINE,
+    )
+    if not from_line_match:
+        return None
+
+    from_header = from_line_match.group(1).strip()
+    email_match = re.search(
+        r"([A-Za-z0-9._%+-]+@(?:[A-Za-z0-9-]+\.)+[A-Za-z]{2,})",
+        from_header,
+    )
+
+    return email_match.group(1).lower() if email_match else None
+
+
+def _is_myworkday_sender(sender_email: str) -> bool:
+    sender_email = sender_email.lower()
+    return sender_email.endswith(".myworkday.com") or sender_email.endswith("@myworkday.com")
 
 
 def _clean_email_text(raw_email: str) -> str:
@@ -98,7 +122,7 @@ def _normalize_status(raw_status: Optional[str], text: str) -> Optional[str]:
     return raw_status
 
 
-def parse_workday_email(raw_email: str) -> ApplicationCreate:
+def parse_workday_email(raw_email: str, sender_email: Optional[str] = None, subject: Optional[str] = None) -> ApplicationCreate:
     """
     Very first-pass parser for Workday job application emails.
 
@@ -109,8 +133,16 @@ def parse_workday_email(raw_email: str) -> ApplicationCreate:
       - Requisition ID: R-12345
       - Status: Application Received
     """
+    sender = (sender_email or _extract_sender_email(raw_email) or "").strip().lower()
+    if not sender:
+        raise ValueError("Missing sender email for Workday validation")
+    if not _is_myworkday_sender(sender):
+        raise ValueError(f"Invalid sender domain for Workday parser: {sender}")
 
-    text = _clean_email_text(raw_email)
+    clean_body = _clean_email_text(raw_email)
+    text = clean_body
+    if subject:
+        text = f"Subject: {subject}\n{clean_body}"
 
     job_title = _search_any(
         (
@@ -162,6 +194,7 @@ def parse_workday_email(raw_email: str) -> ApplicationCreate:
 
     return ApplicationCreate(
         vendor="workday",
+        subject=subject or "",
         job_title=job_title,
         company=company,
         location=location,

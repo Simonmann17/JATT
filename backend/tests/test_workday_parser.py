@@ -14,7 +14,7 @@ class WorkdayParserTests(unittest.TestCase):
         Status: Application Received
         Applied on: February 19, 2026
         """
-        parsed = parse_workday_email(raw_email)
+        parsed = parse_workday_email(raw_email, sender_email="notifications@myworkday.com")
 
         self.assertEqual(parsed.vendor, "workday")
         self.assertEqual(parsed.job_title, "Senior Software Engineer")
@@ -37,7 +37,7 @@ class WorkdayParserTests(unittest.TestCase):
           </body>
         </html>
         """
-        parsed = parse_workday_email(raw_email)
+        parsed = parse_workday_email(raw_email, sender_email="no-reply@myworkday.com")
 
         self.assertEqual(parsed.company, "Globex Inc")
         self.assertEqual(parsed.job_title, "Data Analyst")
@@ -54,18 +54,23 @@ class WorkdayParserTests(unittest.TestCase):
         Thank you for your interest.
         You are no longer under consideration for this role.
         """
-        parsed = parse_workday_email(raw_email)
+        parsed = parse_workday_email(raw_email, sender_email="careers@myworkday.com")
         self.assertEqual(parsed.status, "rejected")
         self.assertEqual(parsed.company, "Initech")
         self.assertEqual(parsed.job_title, "Backend Engineer")
 
     def test_handles_missing_fields(self) -> None:
         raw_email = "Thanks for your application."
-        parsed = parse_workday_email(raw_email)
+        parsed = parse_workday_email(raw_email, sender_email="alerts@myworkday.com")
         self.assertEqual(parsed.vendor, "workday")
         self.assertIsNone(parsed.job_title)
         self.assertIsNone(parsed.company)
         self.assertIsNone(parsed.status)
+
+    def test_rejects_non_myworkday_sender(self) -> None:
+        raw_email = "Thank you for applying to Acme Corp."
+        with self.assertRaises(ValueError):
+            parse_workday_email(raw_email, sender_email="hiring@greenhouse.io")
 
 
 if __name__ == "__main__":
