@@ -1,6 +1,7 @@
 from typing import List, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
 from .db import get_session, init_db
@@ -10,6 +11,19 @@ from .parsers.workday import parse_workday_email
 
 
 app = FastAPI(title="JATT Backend", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.on_event("startup")

@@ -11,6 +11,9 @@ backend/token.json
 # Local database
 backend/jatt.db
 
+#Node Modules
+/frontend/node_modules/
+
 # MacOS system files
 .DS_Store
 
