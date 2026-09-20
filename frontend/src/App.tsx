@@ -171,9 +171,11 @@ export default function App() {
               <h3>Imported Messages</h3>
               <ul className="list">
                 {imported.map((message, idx) => (
-                  <li key={`${message.subject}-${idx}`}>
+                  <li key={`${message.provider_id}-${idx}`}>
                     <strong>{message.sender}</strong>
                     <span>{message.subject}</span>
+                    <span>{message.vendor ?? 'Unrecognized vendor'}</span>
+                    {message.received_at && <span>{formatDate(message.received_at)}</span>}
                   </li>
                 ))}
               </ul>

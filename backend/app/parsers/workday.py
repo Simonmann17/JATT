@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional
 
+from ..vendors import is_workday_sender
+
 try:
     from ..models import ApplicationCreate
 except ModuleNotFoundError:
@@ -59,11 +61,6 @@ def _extract_sender_email(raw_email: str) -> Optional[str]:
     )
 
     return email_match.group(1).lower() if email_match else None
-
-
-def _is_myworkday_sender(sender_email: str) -> bool:
-    sender_email = sender_email.lower()
-    return sender_email.endswith(".myworkday.com") or sender_email.endswith("@myworkday.com")
 
 
 def _clean_email_text(raw_email: str) -> str:
@@ -136,7 +133,7 @@ def parse_workday_email(raw_email: str, sender_email: Optional[str] = None, subj
     sender = (sender_email or _extract_sender_email(raw_email) or "").strip().lower()
     if not sender:
         raise ValueError("Missing sender email for Workday validation")
-    if not _is_myworkday_sender(sender):
+    if not is_workday_sender(sender):
         raise ValueError(f"Invalid sender domain for Workday parser: {sender}")
 
     clean_body = _clean_email_text(raw_email)
