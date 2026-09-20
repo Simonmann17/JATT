@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
 
 from .db import get_session, init_db
-from .gmail_client import fetch_workday_emails
+from .parsers.detector import detect_vendor
+from .gmail_client import fetch_gmail_messages
 from .models import Application, ApplicationCreate, ApplicationRead
 from .parsers.workday import parse_workday_email
 
@@ -69,7 +70,16 @@ async def import_from_gmail(
     Basic mode: fetch recent Gmail emails and return sender/subject.
     Optional sender filtering can be applied via sender_filter.
     """
-    messages = fetch_workday_emails(
+    messages = fetch_gmail_messages(
         limit=limit, lookback_days=lookback_days, sender_filter=sender_filter
     )
-    return [{"sender": m["sender"], "subject": m["subject"]} for m in messages]
+    return [
+        {
+            "provider_id": m["provider_id"],
+            "sender": m["sender"],
+            "subject": m["subject"],
+            "received_at": m["received_at"],
+            "vendor": detect_vendor(m),
+        }
+        for m in messages
+    ]

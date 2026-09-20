@@ -12,6 +12,9 @@ export type Application = {
 };
 
 export type ImportMessage = {
+  provider_id: string;
   sender: string;
   subject: string;
+  received_at: string | null;
+  vendor: string | null;
 };

@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import os
 import re
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import List, Optional, TypedDict
+from typing import List, Optional
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
-
 
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,10 +19,7 @@ CREDENTIALS_PATH = Path(
 )
 
 
-class GmailMessage(TypedDict):
-    raw_email: str
-    sender: str
-    subject: str
+from .email import EmailMessage
 
 
 def _get_credentials() -> Credentials:
@@ -49,9 +46,9 @@ def _build_service():
     return build("gmail", "v1", credentials=creds)
 
 
-def fetch_workday_emails(
+def fetch_gmail_messages(
     limit: int = 5, lookback_days: int = 90, sender_filter: Optional[str] = None
-) -> List[GmailMessage]:
+) -> List[EmailMessage]:
     service = _build_service()
     sender_filter_value = (sender_filter or "").lower().strip()
     query_parts = [f"newer_than:{lookback_days}d"]
@@ -59,7 +56,7 @@ def fetch_workday_emails(
         query_parts.insert(0, f"from:{sender_filter_value}")
     query = " ".join(query_parts)
 
-    parsed_messages: List[GmailMessage] = []
+    parsed_messages: List[EmailMessage] = []
     page_token: Optional[str] = None
     checked = 0
     max_checked = 300 if sender_filter_value else 1000
@@ -99,11 +96,14 @@ def fetch_workday_emails(
             subject = _extract_subject_from_headers(headers)
 
             body = _extract_body_text(payload) or msg_detail.get("snippet", "")
+            received_at = _extract_received_at(msg_detail)
             parsed_messages.append(
                 {
+                    "provider_id": msg_detail["id"],
                     "raw_email": body,
                     "sender": sender,
                     "subject": subject,
+                    "received_at": received_at,
                 }
             )
 
@@ -113,10 +113,14 @@ def fetch_workday_emails(
 
     return parsed_messages
 
-# Helper functions for parsing Gmail message details
-def _is_workday_sender(sender: str) -> bool:
-    sender = sender.lower()
-    return sender.endswith(".myworkday.com") or sender.endswith("@myworkday.com")
+
+def fetch_workday_emails(
+    limit: int = 5, lookback_days: int = 90, sender_filter: Optional[str] = None
+) -> List[EmailMessage]:
+    """Backward-compatible alias for callers using the original function name."""
+    return fetch_gmail_messages(
+        limit=limit, lookback_days=lookback_days, sender_filter=sender_filter
+    )
 
 def _extract_sender_from_headers(headers: list[dict]) -> str:
     from_header = ""
@@ -139,6 +143,16 @@ def _extract_subject_from_headers(headers: list[dict]) -> str:
         if header.get("name", "").lower() == "subject":
             return header.get("value", "").strip()
     return ""
+
+
+def _extract_received_at(message: dict) -> Optional[datetime]:
+    internal_date = message.get("internalDate")
+    if not internal_date:
+        return None
+    try:
+        return datetime.fromtimestamp(int(internal_date) / 1000, tz=timezone.utc)
+    except (TypeError, ValueError, OverflowError):
+        return None
 
 def _extract_body_text(payload: dict) -> str:
     """Extract plain text from a Gmail message payload."""
